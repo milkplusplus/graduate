@@ -4,6 +4,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 
 import static imitationmodel.DistributionType.POISSON;
+import static java.lang.Math.log;
+import static java.lang.Math.random;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -17,8 +19,8 @@ public class PoissonDistribution extends Distribution {
     }
 
     @Override
-    public int calculateNext() {
-        return 0;
+    public Double calculateNext() {
+        return -log(1 - random()) / lambda;
     }
 
     @Override

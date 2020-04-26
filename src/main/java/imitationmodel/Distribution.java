@@ -11,5 +11,5 @@ public abstract class Distribution {
         this.distributionType = distributionType;
     }
 
-    public abstract int calculateNext();
+    public abstract Double calculateNext();
 }

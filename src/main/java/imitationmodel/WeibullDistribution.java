@@ -9,22 +9,24 @@ import static imitationmodel.DistributionType.WEIBULL;
 @EqualsAndHashCode(callSuper = true)
 public class WeibullDistribution extends Distribution {
 
-    Double c;
-    Double b;
+    Double shape;
+    Double scale;
+    org.apache.commons.math3.distribution.WeibullDistribution innerDistribution;
 
-    public WeibullDistribution(Double c, Double b) {
+    public WeibullDistribution(Double shape, Double scale) {
         super(WEIBULL);
-        this.c = c;
-        this.b = b;
+        this.shape = shape;
+        this.scale = scale;
+        this.innerDistribution = new org.apache.commons.math3.distribution.WeibullDistribution(shape, scale);
     }
 
     @Override
-    public int calculateNext() {
-        return 0;
+    public Double calculateNext() {
+        return innerDistribution.sample();
     }
 
     @Override
     public String toString() {
-        return String.format("Weibull distribution with c = %s, b = %s", c, b);
+        return String.format("Weibull distribution with shape = %s, scale = %s", shape, scale);
     }
 }
