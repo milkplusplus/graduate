@@ -3,8 +3,12 @@ package imitationmodel;
 import com.beust.jcommander.JCommander;
 
 import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
+
+import static java.util.Collections.max;
 
 public class Driver {
 
@@ -35,6 +39,7 @@ public class Driver {
 
         Queue<Double> incomingQueue = getIncomingQueue(input);
         Queue<Double> servingQueue = new PriorityQueue<>();
+        Map<Integer, Integer> queueLengthMap = new HashMap<>();
 
         while (!incomingQueue.isEmpty() || !servingQueue.isEmpty() || numberOfChannels != numberOfFreeChannels) {
             Double currentIncomingValue = incomingQueue.peek();
@@ -76,8 +81,13 @@ public class Driver {
                     currentQueueSize--;
                 }
             }
+            queueLengthMap.merge(currentQueueSize, 1, Integer::sum);
         }
-        System.out.println("END");
+
+        System.out.println("Statistics:");
+        queueLengthMap.forEach((k, v) -> System.out.println("Queue size " + k + " was " + v + " times"));
+        System.out.println("Maximum queue length is " + max(queueLengthMap.keySet()));
+        System.out.println("Average queue length is " + getAverageQueueLength(queueLengthMap, input.getNumberOfRequests()));
     }
 
     private static Queue<Double> getIncomingQueue(Input input) {
@@ -89,5 +99,12 @@ public class Driver {
             incomingQueue.add(currentValue);
         }
         return incomingQueue;
+    }
+
+    private static double getAverageQueueLength(Map<Integer, Integer> queueLengthMap, Integer numberOfRequests) {
+        return queueLengthMap.entrySet()
+                             .stream()
+                             .mapToDouble(entry -> entry.getKey() * ((double) entry.getValue() / numberOfRequests))
+                             .sum();
     }
 }
