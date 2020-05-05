@@ -18,6 +18,8 @@ public class RawInput {
 
     @Parameter(names = "-numberOfRequests", required = true)
     Integer numberOfRequests;
+    @Parameter(names = "-queueSize", required = true)
+    Integer queueSize;
     @Parameter(names = "-incomingDistribution", required = true)
     String incomingDistribution;
     @Parameter(names = "-incomingDistributionParameters", required = true)
