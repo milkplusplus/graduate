@@ -32,7 +32,7 @@ public class Driver {
     }
 
     private static void execute(Input input) {
-        final int queueSize = 100_000_000;
+        final int queueSize = 1_000_000;
         final int numberOfChannels = 1;
         int numberOfFreeChannels = numberOfChannels;
         int currentQueueSize = 0;
@@ -104,7 +104,7 @@ public class Driver {
     private static double getAverageQueueLength(Map<Integer, Integer> queueLengthMap, Integer numberOfRequests) {
         return queueLengthMap.entrySet()
                              .stream()
-                             .mapToDouble(entry -> entry.getKey() * ((double) entry.getValue() / numberOfRequests))
+                             .mapToDouble(entry -> entry.getKey() * ((double) entry.getValue() / (2 * numberOfRequests)))
                              .sum();
     }
 }
