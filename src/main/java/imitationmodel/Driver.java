@@ -19,7 +19,15 @@ import static java.util.Collections.max;
 public class Driver {
 
     public static void main(String[] args) {
-        execute(getInput(args));
+        Input input = getInput(args);
+
+        List<Integer> queueLengthsList = performSimulation(input, 1_000_000);
+        Map<Integer, Integer> queueLengthsMap = new HashMap<>();
+        queueLengthsList.forEach(value -> queueLengthsMap.merge(value, 1, Integer::sum));
+
+        int calculatedQueueSize = calculateStatistics(input, queueLengthsList, queueLengthsMap);
+
+        performSimulation(input, calculatedQueueSize);
     }
 
     static Input getInput(String[] args) {
@@ -28,7 +36,6 @@ public class Driver {
 
         Input input = new Input(
                 rawInput.getNumberOfRequests(),
-                rawInput.getQueueSize(),
                 rawInput.getProbabilityOfLoss(),
                 rawInput.createIncomingDistribution(),
                 rawInput.createServingDistribution());
@@ -40,16 +47,16 @@ public class Driver {
         return input;
     }
 
-    private static void execute(Input input) {
+    private static List<Integer> performSimulation(Input input, int queueSize) {
         final int numberOfChannels = 1;
         int numberOfFreeChannels = numberOfChannels;
         int currentQueueSize = 0;
+        int lostRequests = 0;
 
         Queue<Double> incomingQueue = getIncomingQueue(input);
         Queue<Double> servingQueue = new PriorityQueue<>();
 
         List<Integer> queueLengthsList = new ArrayList<>();
-        Map<Integer, Integer> queueLengthsMap = new HashMap<>();
 
         while (!incomingQueue.isEmpty() || !servingQueue.isEmpty() || numberOfChannels != numberOfFreeChannels) {
             Double currentIncomingValue = incomingQueue.peek();
@@ -62,9 +69,10 @@ public class Driver {
                         servingQueue.add(currentIncomingValue + input.getServingDistribution().calculateNext());
                         numberOfFreeChannels--;
                     } else {
-                        currentQueueSize++;
-                        if (currentQueueSize == input.getQueueSize()) {
-                            throw new RuntimeException("Queue size is more than " + input.getQueueSize());
+                        if (currentQueueSize == queueSize) {
+                            lostRequests++;
+                        } else {
+                            currentQueueSize++;
                         }
                     }
                 } else {
@@ -92,10 +100,14 @@ public class Driver {
                 }
             }
             queueLengthsList.add(currentQueueSize);
-            queueLengthsMap.merge(currentQueueSize, 1, Integer::sum);
         }
 
-        calculateStatistics(input, queueLengthsList, queueLengthsMap);
+        if (lostRequests > 0) {
+            System.out.println("Number of lost requests is " + lostRequests + ", probability of lost is "
+                    + ((double) lostRequests) / input.getNumberOfRequests());
+        }
+
+        return queueLengthsList;
     }
 
     private static Queue<Double> getIncomingQueue(Input input) {
@@ -109,7 +121,7 @@ public class Driver {
         return incomingQueue;
     }
 
-    private static void calculateStatistics(Input input, List<Integer> queueLengthsList, Map<Integer, Integer> queueLengthsMap) {
+    private static int calculateStatistics(Input input, List<Integer> queueLengthsList, Map<Integer, Integer> queueLengthsMap) {
         System.out.println("Statistics:");
         queueLengthsMap.forEach((k, v) -> System.out.println("Queue size " + k + " was " + v + " times"));
         System.out.println("Maximum queue length is " + max(queueLengthsMap.keySet()));
@@ -130,7 +142,7 @@ public class Driver {
         printListValues("Max values of subsequence of max lengths list:", maxValuesOfSubsequenceOfMaxLengths);
         System.out.println("Number of values in max values of subsequence of max lengths list: " + maxValuesOfSubsequenceOfMaxLengths.size());
 
-        calculateQueueSize(maxValuesOfSubsequenceOfMaxLengths, averageK, input.getProbabilityOfLoss());
+        return calculateQueueSize(maxValuesOfSubsequenceOfMaxLengths, averageK, input.getProbabilityOfLoss());
     }
 
     private static double getAverageQueueLength(Map<Integer, Integer> queueLengthMap, Integer numberOfRequests) {
@@ -140,7 +152,7 @@ public class Driver {
                              .sum();
     }
 
-    private static void calculateQueueSize(List<Integer> maxLengths, double averageK, double probabilityOfLoss) {
+    private static int calculateQueueSize(List<Integer> maxLengths, double averageK, double probabilityOfLoss) {
         Map<Integer, Double> histogramMap = createHistogramMap(maxLengths);
 
         double averageX = histogramMap.keySet().stream().mapToDouble(Integer::doubleValue).sum() / histogramMap.size();
@@ -159,8 +171,11 @@ public class Driver {
         System.out.println("Coefficient A is " + coefficientA);
         System.out.println("Coefficient B is " + coefficientB);
         System.out.println("Coefficient R is " + coefficientR);
+        System.out.println("Entered probability of lost is " + probabilityOfLoss);
 
         System.out.println("Calculated N size is " + ceilN);
+
+        return ceilN;
     }
 
     private static Map<Integer, Double> createHistogramMap(List<Integer> maxLengths) {

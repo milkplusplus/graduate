@@ -18,8 +18,6 @@ public class RawInput {
 
     @Parameter(names = "-numberOfRequests", required = true)
     Integer numberOfRequests;
-    @Parameter(names = "-queueSize", required = true)
-    Integer queueSize;
     @Parameter(names = "-probabilityOfLoss", required = true)
     Double probabilityOfLoss;
     @Parameter(names = "-incomingDistribution", required = true)
