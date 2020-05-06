@@ -10,7 +10,10 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.StringJoiner;
+import java.util.TreeMap;
 
+import static java.lang.Math.exp;
+import static java.lang.Math.log;
 import static java.util.Collections.max;
 
 public class Driver {
@@ -23,8 +26,12 @@ public class Driver {
         RawInput rawInput = new RawInput();
         JCommander.newBuilder().addObject(rawInput).build().parse(args);
 
-        Input input = new Input(rawInput.getNumberOfRequests(), rawInput.getQueueSize(),
-                rawInput.createIncomingDistribution(), rawInput.createServingDistribution());
+        Input input = new Input(
+                rawInput.getNumberOfRequests(),
+                rawInput.getQueueSize(),
+                rawInput.getProbabilityOfLoss(),
+                rawInput.createIncomingDistribution(),
+                rawInput.createServingDistribution());
 
         System.out.println("Input parameters:");
         System.out.println("Number of requests = " + input.getNumberOfRequests());
@@ -88,25 +95,7 @@ public class Driver {
             queueLengthsMap.merge(currentQueueSize, 1, Integer::sum);
         }
 
-        System.out.println("Statistics:");
-        queueLengthsMap.forEach((k, v) -> System.out.println("Queue size " + k + " was " + v + " times"));
-        System.out.println("Maximum queue length is " + max(queueLengthsMap.keySet()));
-        System.out.println("Average queue length is " + getAverageQueueLength(queueLengthsMap, input.getNumberOfRequests()));
-
-        printListValues("List of queue lengths:", queueLengthsList);
-
-        List<Integer> maxLengthsList = getMaxLengthsList(queueLengthsList);
-        printListValues("List of max queue lengths:", maxLengthsList);
-
-        long numberOfNotNullValuesInQueue = queueLengthsList.stream().filter(v -> v != 0).count();
-        double averageK = (double) numberOfNotNullValuesInQueue / maxLengthsList.size();
-        System.out.println("Number of not null values in queue: " + numberOfNotNullValuesInQueue);
-        System.out.println("Number of values in max lengths list: " + maxLengthsList.size());
-        System.out.println("Average K: " + averageK);
-
-        List<Integer> maxValuesOfSubsequenceOfMaxLengths = getMaxValuesOfSubsequenceOfMaxLengths(maxLengthsList);
-        printListValues("Max values of subsequence of max lengths list:", maxValuesOfSubsequenceOfMaxLengths);
-        System.out.println("Number of values in max values of subsequence of max lengths list: " + maxValuesOfSubsequenceOfMaxLengths.size());
+        calculateStatistics(input, queueLengthsList, queueLengthsMap);
     }
 
     private static Queue<Double> getIncomingQueue(Input input) {
@@ -120,6 +109,30 @@ public class Driver {
         return incomingQueue;
     }
 
+    private static void calculateStatistics(Input input, List<Integer> queueLengthsList, Map<Integer, Integer> queueLengthsMap) {
+        System.out.println("Statistics:");
+        queueLengthsMap.forEach((k, v) -> System.out.println("Queue size " + k + " was " + v + " times"));
+        System.out.println("Maximum queue length is " + max(queueLengthsMap.keySet()));
+        System.out.println("Average queue length is " + getAverageQueueLength(queueLengthsMap, input.getNumberOfRequests()));
+
+        printListValues("List of queue lengths:", queueLengthsList);
+
+        List<Integer> maxLengths = getMaxLengths(queueLengthsList);
+        printListValues("List of max queue lengths:", maxLengths);
+
+        long numberOfNotNullValuesInQueue = queueLengthsList.stream().filter(v -> v != 0).count();
+        double averageK = (double) numberOfNotNullValuesInQueue / maxLengths.size();
+        System.out.println("Number of not null values in queue: " + numberOfNotNullValuesInQueue);
+        System.out.println("Number of values in max lengths list: " + maxLengths.size());
+        System.out.println("Average K: " + averageK);
+
+        List<Integer> maxValuesOfSubsequenceOfMaxLengths = getMaxValuesOfSubsequenceOfMaxLengths(maxLengths);
+        printListValues("Max values of subsequence of max lengths list:", maxValuesOfSubsequenceOfMaxLengths);
+        System.out.println("Number of values in max values of subsequence of max lengths list: " + maxValuesOfSubsequenceOfMaxLengths.size());
+
+        calculateQueueSize(maxValuesOfSubsequenceOfMaxLengths, averageK, input.getProbabilityOfLoss());
+    }
+
     private static double getAverageQueueLength(Map<Integer, Integer> queueLengthMap, Integer numberOfRequests) {
         return queueLengthMap.entrySet()
                              .stream()
@@ -127,7 +140,45 @@ public class Driver {
                              .sum();
     }
 
-    private static List<Integer> getMaxLengthsList(List<Integer> queueLengthList) {
+    private static void calculateQueueSize(List<Integer> maxLengths, double averageK, double probabilityOfLoss) {
+        Map<Integer, Double> histogramMap = createHistogramMap(maxLengths);
+
+        double averageX = histogramMap.keySet().stream().mapToDouble(Integer::doubleValue).sum() / histogramMap.size();
+        double averageU = histogramMap.values().stream().mapToDouble(Double::doubleValue).sum() / histogramMap.size();
+        double sumOfAllXU = histogramMap.entrySet().stream().map(entry -> entry.getKey() * entry.getValue()).mapToDouble(Double::doubleValue).sum();
+        double sumOfSquaresOfU = histogramMap.values().stream().mapToDouble(Double::doubleValue).map(v -> v * v).sum();
+
+        double coefficientA = (sumOfAllXU - histogramMap.size() * averageX * averageU) / (sumOfSquaresOfU - histogramMap.size() * averageU * averageU);
+        double coefficientB = averageX - coefficientA * averageU;
+        double coefficientR = exp(0.5 / coefficientA);
+
+        double rawN = coefficientA * log(coefficientA * coefficientR / (50 * averageK * probabilityOfLoss)) + coefficientB - 1;
+        int ceilN = (int) Math.ceil(rawN);
+
+        System.out.println("X->U values are " + histogramMap);
+        System.out.println("Coefficient A is " + coefficientA);
+        System.out.println("Coefficient B is " + coefficientB);
+        System.out.println("Coefficient R is " + coefficientR);
+
+        System.out.println("Calculated N size is " + ceilN);
+    }
+
+    private static Map<Integer, Double> createHistogramMap(List<Integer> maxLengths) {
+        Map<Integer, Double> histogramMap = new TreeMap<>();
+        maxLengths.forEach(value -> histogramMap.merge(value, 1.0, Double::sum));
+
+        System.out.println("Values for histogram are " + histogramMap);
+
+        double previousValue = 0.0;
+        for (Map.Entry<Integer, Double> entry : histogramMap.entrySet()) {
+            previousValue += entry.getValue() / (maxLengths.size() + 1);
+            entry.setValue(-log(-log(previousValue)));
+        }
+
+        return histogramMap;
+    }
+
+    private static List<Integer> getMaxLengths(List<Integer> queueLengthList) {
         List<Integer> maxLengthsList = new ArrayList<>();
 
         Integer currentMaxValue = 0;
@@ -147,7 +198,7 @@ public class Driver {
 
     private static List<Integer> getMaxValuesOfSubsequenceOfMaxLengths(List<Integer> maxLengthsList) {
         if (maxLengthsList.size() < 1000) {
-            return maxLengthsList;
+            return new ArrayList<>(maxLengthsList);
         }
 
         List<Integer> result = new ArrayList<>();
