@@ -1,6 +1,7 @@
 package imitationmodel;
 
 import com.beust.jcommander.JCommander;
+import org.apache.log4j.Logger;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -38,12 +39,16 @@ public class Driver {
                 rawInput.getNumberOfRequests(),
                 rawInput.getProbabilityOfLoss(),
                 rawInput.createIncomingDistribution(),
-                rawInput.createServingDistribution());
+                rawInput.createServingDistribution(),
+                getAppropriateLogger(rawInput.getLogType(), rawInput.getLogDestination()));
 
-        System.out.println("Input parameters:");
-        System.out.println("Number of requests = " + input.getNumberOfRequests());
-        System.out.println("Incoming distribution is " + input.getIncomingDistribution().toString());
-        System.out.println("Serving distribution is " + input.getServingDistribution().toString());
+        Logger log = input.getLog();
+
+        log.warn("\nInput parameters:");
+        log.warn("Number of requests = " + input.getNumberOfRequests());
+        log.warn("Probability of loss = " + input.getProbabilityOfLoss());
+        log.warn("Incoming distribution is " + input.getIncomingDistribution().toString());
+        log.warn("Serving distribution is " + input.getServingDistribution().toString());
         return input;
     }
 
@@ -103,7 +108,7 @@ public class Driver {
         }
 
         if (lostRequests > 0) {
-            System.out.println("Number of lost requests is " + lostRequests + ", probability of lost is "
+            input.getLog().warn("Number of lost requests is " + lostRequests + ", probability of lost is "
                     + ((double) lostRequests) / input.getNumberOfRequests());
         }
 
@@ -122,27 +127,29 @@ public class Driver {
     }
 
     private static int calculateStatistics(Input input, List<Integer> queueLengthsList, Map<Integer, Integer> queueLengthsMap) {
-        System.out.println("Statistics:");
-        queueLengthsMap.forEach((k, v) -> System.out.println("Queue size " + k + " was " + v + " times"));
-        System.out.println("Maximum queue length is " + max(queueLengthsMap.keySet()));
-        System.out.println("Average queue length is " + getAverageQueueLength(queueLengthsMap, input.getNumberOfRequests()));
+        Logger log = input.getLog();
 
-        printListValues("List of queue lengths:", queueLengthsList);
+        log.warn("\nStatistics:");
+        queueLengthsMap.forEach((k, v) -> log.info("Queue size " + k + " was " + v + " times"));
+        log.warn("Maximum queue length is " + max(queueLengthsMap.keySet()));
+        log.warn("Average queue length is " + getAverageQueueLength(queueLengthsMap, input.getNumberOfRequests()));
+
+        printListValues("List of queue lengths:", queueLengthsList, log);
 
         List<Integer> maxLengths = getMaxLengths(queueLengthsList);
-        printListValues("List of max queue lengths:", maxLengths);
+        printListValues("List of max queue lengths:", maxLengths, log);
 
         long numberOfNotNullValuesInQueue = queueLengthsList.stream().filter(v -> v != 0).count();
         double averageK = (double) numberOfNotNullValuesInQueue / maxLengths.size();
-        System.out.println("Number of not null values in queue: " + numberOfNotNullValuesInQueue);
-        System.out.println("Number of values in max lengths list: " + maxLengths.size());
-        System.out.println("Average K: " + averageK);
+        log.warn("Number of not null values in queue: " + numberOfNotNullValuesInQueue);
+        log.warn("Number of values in max lengths list: " + maxLengths.size());
+        log.warn("Average K: " + averageK);
 
         List<Integer> maxValuesOfSubsequenceOfMaxLengths = getMaxValuesOfSubsequenceOfMaxLengths(maxLengths);
-        printListValues("Max values of subsequence of max lengths list:", maxValuesOfSubsequenceOfMaxLengths);
-        System.out.println("Number of values in max values of subsequence of max lengths list: " + maxValuesOfSubsequenceOfMaxLengths.size());
+        printListValues("Max values of subsequence of max lengths list:", maxValuesOfSubsequenceOfMaxLengths, log);
+        log.warn("Number of values in max values of subsequence of max lengths list: " + maxValuesOfSubsequenceOfMaxLengths.size());
 
-        return calculateQueueSize(maxValuesOfSubsequenceOfMaxLengths, averageK, input.getProbabilityOfLoss());
+        return calculateQueueSize(maxValuesOfSubsequenceOfMaxLengths, averageK, input.getProbabilityOfLoss(), log);
     }
 
     private static double getAverageQueueLength(Map<Integer, Integer> queueLengthMap, Integer numberOfRequests) {
@@ -152,8 +159,8 @@ public class Driver {
                              .sum();
     }
 
-    private static int calculateQueueSize(List<Integer> maxLengths, double averageK, double probabilityOfLoss) {
-        Map<Integer, Double> histogramMap = createHistogramMap(maxLengths);
+    private static int calculateQueueSize(List<Integer> maxLengths, double averageK, double probabilityOfLoss, Logger log) {
+        Map<Integer, Double> histogramMap = createHistogramMap(maxLengths, log);
 
         double averageX = histogramMap.keySet().stream().mapToDouble(Integer::doubleValue).sum() / histogramMap.size();
         double averageU = histogramMap.values().stream().mapToDouble(Double::doubleValue).sum() / histogramMap.size();
@@ -167,22 +174,22 @@ public class Driver {
         double rawN = coefficientA * log(coefficientA * coefficientR / (50 * averageK * probabilityOfLoss)) + coefficientB - 1;
         int ceilN = (int) Math.ceil(rawN);
 
-        System.out.println("X->U values are " + histogramMap);
-        System.out.println("Coefficient A is " + coefficientA);
-        System.out.println("Coefficient B is " + coefficientB);
-        System.out.println("Coefficient R is " + coefficientR);
-        System.out.println("Entered probability of lost is " + probabilityOfLoss);
+        log.warn("X->U values are " + histogramMap);
+        log.warn("Coefficient A is " + coefficientA);
+        log.warn("Coefficient B is " + coefficientB);
+        log.warn("Coefficient R is " + coefficientR);
+        log.info("Entered probability of lost is " + probabilityOfLoss);
 
-        System.out.println("Calculated N size is " + ceilN);
+        log.warn("Calculated N size is " + ceilN);
 
         return ceilN;
     }
 
-    private static Map<Integer, Double> createHistogramMap(List<Integer> maxLengths) {
+    private static Map<Integer, Double> createHistogramMap(List<Integer> maxLengths, Logger log) {
         Map<Integer, Double> histogramMap = new TreeMap<>();
         maxLengths.forEach(value -> histogramMap.merge(value, 1.0, Double::sum));
 
-        System.out.println("Values for histogram are " + histogramMap);
+        log.warn("Values for histogram are " + histogramMap);
 
         double previousValue = 0.0;
         for (Map.Entry<Integer, Double> entry : histogramMap.entrySet()) {
@@ -235,14 +242,30 @@ public class Driver {
         return result;
     }
 
-    private static void printListValues(String title, List<?> list) {
-        System.out.println(title);
+    private static void printListValues(String title, List<?> list, Logger log) {
+        log.info(title);
         StringJoiner joiner = new StringJoiner(", ");
         for (int i = 0; i < list.size(); i++) {
             joiner.add(list.get(i).toString());
             if (i % 50 == 49 || (i == list.size() - 1)) {
-                System.out.println(joiner.toString());
+                log.info(joiner.toString());
                 joiner = new StringJoiner(", ");
+            }
+        }
+    }
+
+    static Logger getAppropriateLogger(String logType, String logDestination) {
+        if ("full".equalsIgnoreCase(logType)) {
+            if ("console".equalsIgnoreCase(logDestination)) {
+                return Logger.getLogger("FullConsole");
+            } else {
+                return Logger.getLogger("FullFile");
+            }
+        } else {
+            if ("console".equalsIgnoreCase(logDestination)) {
+                return Logger.getLogger("MainConsole");
+            } else {
+                return Logger.getLogger("MainFile");
             }
         }
     }

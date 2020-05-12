@@ -1,6 +1,7 @@
 package imitationmodel;
 
 import lombok.Value;
+import org.apache.log4j.Logger;
 
 @Value
 public class Input {
@@ -8,4 +9,5 @@ public class Input {
     Double probabilityOfLoss;
     Distribution incomingDistribution;
     Distribution servingDistribution;
+    Logger log;
 }

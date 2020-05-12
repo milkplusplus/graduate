@@ -28,6 +28,10 @@ public class RawInput {
     String servingDistribution;
     @Parameter(names = "-servingDistributionParameters", required = true)
     String servingDistributionParameters;
+    @Parameter(names = "-logType")
+    String logType;
+    @Parameter(names = "-logDestination")
+    String logDestination;
 
     public Distribution createIncomingDistribution() {
         return getDistributionByRawValues(incomingDistribution, incomingDistributionParameters);
