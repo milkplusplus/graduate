@@ -254,7 +254,7 @@ public class Driver {
         }
     }
 
-    static Logger getAppropriateLogger(String logType, String logDestination) {
+    private static Logger getAppropriateLogger(String logType, String logDestination) {
         if ("full".equalsIgnoreCase(logType)) {
             if ("console".equalsIgnoreCase(logDestination)) {
                 return Logger.getLogger("FullConsole");
